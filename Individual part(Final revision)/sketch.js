@@ -7,8 +7,21 @@ var img5Pixelation; // Instance of the pixelation effect for the fifth image
 var img2Movable, img3Movable, img4Movable; // Instances of the movable images
 var bgSound; // Background sound
 var audioPlayed = false; // Variable to track if audio has been played
+var waveEffectEnabled = false; // Variable to track if wave effect is enabled
+var rainEnabled = false; // Variable to track if rain effect is enabled
 
-// Preload images and sound
+// Initialize raindrops array and constants
+var rainDrops = []; // Array to store raindrop objects
+var numRainDrops = 50; // Number of raindrops
+var maxDropSize = 15; // Maximum size of raindrops
+var minDropSize = 10; // Minimum size of raindrops
+var maxDropSpeed = 15; // Maximum speed of raindrops
+var minDropSpeed = 10; // Minimum speed of raindrops
+
+var clickText = "Click"; // Text to display on click
+var clickTextVisible = true; // Variable to track if click text is visible
+
+// Preload images
 function preload() {
   img = loadImage("assets/painting.jpg");
   img2 = loadImage("assets/gull1.png");
@@ -27,6 +40,7 @@ function setup() {
   imageMode(CENTER); // Set image mode to center
   noStroke(); // Disable stroke
   background(255); // Set background color to white
+  textAlign(CENTER, CENTER); // Set text alignment to center
 
   // Initialize the wave effect instance
   waveEffect = new WaveEffect(img, pixelSize);
@@ -36,24 +50,37 @@ function setup() {
   img2Movable = new MovableImage(img2, WIDTH / 2, HEIGHT / 4, 1, 0.5, 0.5, 0.5);
   img3Movable = new MovableImage(img3, WIDTH / 1.25, HEIGHT / 4, -1, 0.5, 0.5, 0.5);
   img4Movable = new MovableImage(img4, WIDTH / 1.5, HEIGHT * 3 / 4, 1, 1, 0.5, 0.5);
+  
+  // Initialize raindrops
+  for (var i = 0; i < numRainDrops; i++) {
+    var x = random(width); // Random x-coordinate within canvas width
+    var y = random(-height, 0); // Random y-coordinate above canvas
+    var size = random(minDropSize, maxDropSize); // Random size
+    var speed = random(minDropSpeed, maxDropSpeed); // Random speed
+    rainDrops.push(new RainDrop(x, y, size, speed)); // Create raindrop object and add to array
+  }
 }
 
 // Draw function
 function draw() {
+  // Display click text if visible
+  if (clickTextVisible) {
+    fill(0); // Set text color to black
+    textSize(32); // Set text size
+    text(clickText, width / 2, height / 2); // Display click text at center
+  }
   // If the wave effect hasn't started, draw the initial wave
-  if (!waveEffect.startWave) {
+  if (!waveEffectEnabled) {
     waveEffect.drawInitialWave();
   } else {
     // If the wave effect has started, draw the wave effect
     waveEffect.drawWave();
   }
 
-  // Update the position of each movable image if audio has been played
-  if (audioPlayed) {
-    img2Movable.updatePosition(WIDTH / 2);
-    img3Movable.updatePosition(WIDTH / 1.25);
-    img4Movable.updatePosition(WIDTH / 1.5);
-  }
+  // Update the position of each movable image
+  img2Movable.updatePosition(WIDTH / 2);
+  img3Movable.updatePosition(WIDTH / 1.25);
+  img4Movable.updatePosition(WIDTH / 1.5);
 
   // Draw each movable image
   img2Movable.draw();
@@ -67,15 +94,33 @@ function draw() {
 
   // Apply black and white filter to the entire canvas
   applyBlackAndWhiteFilter();
-
+  
   // Draw black rectangles on all four sides
   fill(0); // Set fill color to black
-  rect(0, 0, WIDTH, 50); // Top
-  rect(0, HEIGHT - 50, WIDTH, 50); // Bottom
-  rect(0, 0, 50, HEIGHT); // Left
-  rect(WIDTH - 50, 0, 50, HEIGHT); // Right
-}
+  rect(0, 0, WIDTH, 30); // Top
+  rect(0, HEIGHT - 30, WIDTH, 30); // Bottom
+  rect(0, 0, 30, HEIGHT); // Left
+  rect(WIDTH - 30, 0, 30, HEIGHT); // Right
 
+  if (audioPlayed) {
+    img2Movable.updatePosition(WIDTH / 2);
+    img3Movable.updatePosition(WIDTH / 1.25);
+    img4Movable.updatePosition(WIDTH / 1.5);
+  }
+
+  // Draw raindrops if rain effect is enabled
+  if (rainEnabled) {
+    for (var i = 0; i < rainDrops.length; i++) {
+      rainDrops[i].fall(); // Make raindrop fall
+      rainDrops[i].display(); // Display raindrop
+    }
+  }
+}
+// Function to handle mouse click event
+function mouseClicked() {
+  // Hide click text when clicked
+  clickTextVisible = false;
+}
 // Apply black and white filter to the entire canvas
 function applyBlackAndWhiteFilter() {
   loadPixels(); // Load the pixel data for the canvas
@@ -88,16 +133,19 @@ function applyBlackAndWhiteFilter() {
   updatePixels(); // Update the canvas with the modified pixel data
 }
 
-// Start playing background sound when canvas is clicked
-function startAudio() {
-  if (!audioPlayed) {
-    bgSound.loop();
-    audioPlayed = true;
-    // Enable movement for all movable images
-    img2Movable.enableMovement();
-    img3Movable.enableMovement();
-    img4Movable.enableMovement();
+// Fisher-Yates Shuffle algorithm to shuffle an array, this technique was not covered in class(this technique is from https://www.tutorialspoint.com/data_structures_algorithms/dsa_fisher_yates_shuffle_algorithm.htm)
+function shuffle(array, shouldShuffle) {
+  // If shouldShuffle is false, return the original array without shuffling
+  if (!shouldShuffle) return array;
+  // Start from the last element and iterate backwards
+  for (let i = array.length - 1; i > 0; i--) {
+    // Generate a random integer j between 0 and i
+    const j = Math.floor(Math.random() * (i + 1));
+    // Swap array[i] and array[j]
+    [array[i], array[j]] = [array[j], array[i]];
   }
+  // Return the shuffled array
+  return array;
 }
 
 // ImagePixelation class to handle the pixelated drawing of the painting
@@ -132,7 +180,6 @@ class MovableImage {
     this.speed = speed; // Movement speed
     this.width = img.width * widthScale; // Scaled width
     this.height = img.height * heightScale; // Scaled height
-    this.moveEnabled = false; // Variable to enable/disable movement
   }
 
   // Update the image position
@@ -178,10 +225,10 @@ class WaveEffect {
   initializePixels() {
     for (let y = 0; y < this.img.height; y += this.pixelSize) {
       for (let x = 0; x < this.img.width; x += this.pixelSize) {
-        const frequency = random(0.01, 0.05); // Random frequency
+        const frequency = random(0.1, 0.2); // Random frequency
         const amplitude = 20 + (x % this.pixelSize) * 10; // Amplitude
         const oy = random(-30, 30); // Pixel offset
-        this.pixelsToDraw.push({ x: x, y: y, frequency: frequency, offset: 0, amplitude: amplitude, oy: oy }); // Add pixel to array
+        this.pixelsToDraw.push({x: x, y: y, frequency: frequency, offset: 0, amplitude: amplitude, oy: oy}); // Add pixel to array
       }
     }
     shuffle(this.pixelsToDraw, true); // Shuffle the pixel array
@@ -192,7 +239,6 @@ class WaveEffect {
   drawInitialWave() {
     for (let i = 0; i < 100; i++) { // Draw 100 pixel blocks per frame
       if (this.drawnPixels >= this.totalPixels) { // If all pixel blocks are drawn
-        this.startWave = true; // Start the wave effect
         break;
       }
       let pixel = this.pixelsToDraw[this.drawnPixels]; // Get the current pixel
@@ -222,20 +268,49 @@ class WaveEffect {
   }
 }
 
-// Fisher-Yates Shuffle algorithm to shuffle an array, this technique was not covered in class (this technique is from https://www.tutorialspoint.com/data_structures_algorithms/dsa_fisher_yates_shuffle_algorithm.htm)
-function shuffle(array, shouldShuffle) {
-  // If shouldShuffle is false, return the original array without shuffling
-  if (!shouldShuffle) return array;
-  // Start from the last element and iterate backwards
-  for (let i = array.length - 1; i > 0; i--) {
-    // Generate a random integer j between 0 and i
-    const j = Math.floor(Math.random() * (i + 1));
-    // Swap array[i] and array[j]
-    [array[i], array[j]] = [array[j], array[i]];
+// Function to start audio and enable effects
+function startAudio() {
+  if (!audioPlayed) {
+    bgSound.loop();
+    audioPlayed = true;
+    waveEffectEnabled = true;
+    rainEnabled = true; // Enable rain effect
+    // enable image movement
+    img2Movable.enableMovement();
+    img3Movable.enableMovement();
+    img4Movable.enableMovement();
   }
-  // Return the shuffled array
-  return array;
 }
+
+// RainDrop class
+class RainDrop {
+  constructor(x, y, size, speed) {
+    this.x = x; // x-coordinate
+    this.y = y; // y-coordinate
+    this.size = size; // Size of raindrop
+    this.speed = speed; // Speed of raindrop
+  }
+
+  // Function to make raindrop fall
+  fall() {
+    this.y += this.speed; // Move raindrop down by its speed
+    // If raindrop goes below canvas, reset its position to the top
+    if (this.y + 70 > height  - this.size / 3) {
+      this.y = random(-height, 0);
+      this.x = random(width);
+    }
+  }
+
+  // Function to display raindrop
+  display() {
+    // Set raindrop color and size
+    fill(255, 100); 
+    ellipse(this.x, this.y, this.size / 3, this.size * 2); // Draw raindrop
+  }
+}
+
+
+
 
 
 
