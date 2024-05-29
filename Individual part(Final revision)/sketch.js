@@ -1,4 +1,4 @@
-// Define global variables
+// Define global variables here
 var img, img2, img3, img4, img5; // Image variables
 var WIDTH, HEIGHT; // Canvas width and height
 var pixelSize = 10; // Size of the pixel blocks
